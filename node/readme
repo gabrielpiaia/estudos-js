@@ -1,0 +1,9 @@
+npm é o gerenciador de pacotes do node
+responsavel por baixar modulos de terceiros
+
+npm install nome_do_modulo
+
+
+i = install
+
+npm i lodash
