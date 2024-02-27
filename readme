@@ -13,3 +13,10 @@ instalar  de forma global (-g) e vai instalar numa pasta global
 npm i -g nodemon
 
 package.json indica as dependencias q precisa
+
+
+instalar modulo express no diretorio do projeto
+
+npm i --save express@4.16.2 -E
+
+npm i --save body-parser  /ajustar bory para analisar oque veio e transformar em objeto
