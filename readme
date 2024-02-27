@@ -11,3 +11,5 @@ npm i lodash
 
 instalar  de forma global (-g) e vai instalar numa pasta global
 npm i -g nodemon
+
+package.json indica as dependencias q precisa
