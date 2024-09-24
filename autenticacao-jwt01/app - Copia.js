@@ -107,68 +107,71 @@ app.get('/', (req, res) => {
  *       500:
  *         description: Erro ao registrar usuário
  */
+// Rota para registro de usuário
 app.post('/auth/register', async (req, res) => {
   const { name, email, password, confirmpassword } = req.body;
 
   // Validações
   if (!name) {
-    return res.status(422).json({ msg: "Informar nome" });
+      return res.status(422).json({ msg: "Informar nome" });
   }
   if (!email) {
-    return res.status(422).json({ msg: "Informar email" });
+      return res.status(422).json({ msg: "Informar email" });
   }
   if (!password) {
-    return res.status(422).json({ msg: "Informar senha" });
+      return res.status(422).json({ msg: "Informar senha" });
   }
   if (password !== confirmpassword) {
-    return res.status(422).json({ msg: "As senhas não coincidem" });
+      return res.status(422).json({ msg: "As senhas não coincidem" });
   }
 
   // Criar senha criptografada
   try {
-    const salt = await bcrypt.genSalt(12);
-    const passwordHash = await bcrypt.hash(password, salt);
+      const salt = await bcrypt.genSalt(12);
+      const passwordHash = await bcrypt.hash(password, salt);
 
-    // Inserir no banco de dados com senha criptografada
-    const query = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
-    connection.query(query, [name, email, passwordHash], (err, result) => {
-      if (err) {
-        return res.status(500).json({ msg: 'Erro ao registrar usuário', error: err.message });
-      }
-      res.status(201).json({ msg: 'Usuário registrado com sucesso!' });
-    });
+      // Inserir no banco de dados com senha criptografada
+      const query = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
+      connection.query(query, [name, email, passwordHash], (err, result) => {
+          if (err) {
+              return res.status(500).json({ msg: 'Erro ao registrar usuário', error: err.message });
+          }
+          res.status(201).json({ msg: 'Usuário registrado com sucesso!' });
+      });
   } catch (error) {
-    res.status(500).json({ msg: 'Erro ao criptografar a senha', error: error.message });
+      res.status(500).json({ msg: 'Erro ao criptografar a senha', error: error.message });
   }
 });
 
 /**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Fazer login e gerar token JWT
- *     tags: [Usuários]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Autenticação bem-sucedida
- *       422:
- *         description: Erro de validação
- *       404:
- *         description: Usuário não encontrado
- *       500:
- *         description: Erro ao gerar token
- */
+* @swagger
+* /auth/register:
+*   post:
+*     summary: Registrar um novo usuário
+*     tags: [Usuários]
+*     requestBody:
+*       required: true
+*       content:
+*         application/json:
+*           schema:
+*             type: object
+*             properties:
+*               name:
+*                 type: string
+*               email:
+*                 type: string
+*               password:
+*                 type: string
+*               confirmpassword:
+*                 type: string
+*     responses:
+*       201:
+*         description: Usuário registrado com sucesso
+*       422:
+*         description: Erro de validação
+*       500:
+*         description: Erro ao registrar usuário
+*/
 app.post("/auth/login", (req, res) => {
   const { email, password } = req.body;
 
