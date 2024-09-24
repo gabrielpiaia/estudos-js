@@ -1,0 +1,15 @@
+CRIAR .ENV :
+
+
+
+
+npm init -y              criar package.json
+npm install bcrypt       criptografar senhas
+npm install dotenv       ter arquivo de configuração  criar .env
+npm install express      usado para API
+npm install jsonwebtoken      jasonwebtoken
+npm install mongoose     interação com banco mongo
+
+
+---------- para ambiente de dev:
+npm install --save-dev nodemon
