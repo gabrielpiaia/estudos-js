@@ -9,7 +9,7 @@ npm install dotenv       ter arquivo de configuração  criar .env
 npm install express      usado para API
 npm install jsonwebtoken      jasonwebtoken
 npm install mongoose     interação com banco mongo
-
+npm install mysql2
 
 ---------- para ambiente de dev:
 npm install --save-dev nodemon
