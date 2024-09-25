@@ -4,7 +4,7 @@ const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const swaggerUi = require('swagger-ui-express');
-const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerDocs = require('./swaggerDoc'); // Importando o Swagger Docs
 
 const app = express();
 
@@ -16,6 +16,7 @@ const dbUser = process.env.DB_USER;
 const dbHost = process.env.DB_HOST;
 const dbPassword = process.env.DB_PASSWORD;
 const dbDatabase = process.env.DB_DATABASE;
+const acessPort = process.env.ACESS_PORT;
 
 // Configurar a conexão com o MySQL
 const connection = mysql.createConnection({
@@ -35,20 +36,7 @@ connection.connect((err) => {
 });
 
 // Configurando Swagger
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0', // versão do OpenAPI
-    info: {
-      title: 'API de Autenticação',
-      version: '1.0.0',
-      description: 'Documentação da API de autenticação usando JWT e MySQL',
-    },
-  },
-  apis: ['./app.js'], // caminho para os arquivos que contêm a documentação
-};
-
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use('/api-doc', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Middleware de verificação de token
 function checkToken(req, res, next) {
@@ -78,35 +66,7 @@ app.get('/', (req, res) => {
   res.status(200).json({ msg: 'Teste OK' });
 });
 
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Registrar um novo usuário
- *     tags: [Usuários]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *               confirmpassword:
- *                 type: string
- *     responses:
- *       201:
- *         description: Usuário registrado com sucesso
- *       422:
- *         description: Erro de validação
- *       500:
- *         description: Erro ao registrar usuário
- */
+// Rota para registro de usuário
 app.post('/auth/register', async (req, res) => {
   const { name, email, password, confirmpassword } = req.body;
 
@@ -124,12 +84,12 @@ app.post('/auth/register', async (req, res) => {
     return res.status(422).json({ msg: "As senhas não coincidem" });
   }
 
-  // Criar senha criptografada
   try {
+    // Criptografar senha
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Inserir no banco de dados com senha criptografada
+    // Inserir no banco de dados
     const query = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
     connection.query(query, [name, email, passwordHash], (err, result) => {
       if (err) {
@@ -142,33 +102,7 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Fazer login e gerar token JWT
- *     tags: [Usuários]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Autenticação bem-sucedida
- *       422:
- *         description: Erro de validação
- *       404:
- *         description: Usuário não encontrado
- *       500:
- *         description: Erro ao gerar token
- */
+// Rota para login
 app.post("/auth/login", (req, res) => {
   const { email, password } = req.body;
 
@@ -192,7 +126,7 @@ app.post("/auth/login", (req, res) => {
 
     const user = results[0];
 
-    // Comparar a senha fornecida com a senha criptografada no banco de dados
+    // Comparar senha fornecida com a senha no banco de dados
     const checkPassword = await bcrypt.compare(password, user.password);
     if (!checkPassword) {
       return res.status(422).json({ msg: "Senha inválida!" });
@@ -210,32 +144,12 @@ app.post("/auth/login", (req, res) => {
   });
 });
 
-/**
- * @swagger
- * /user/{id}:
- *   get:
- *     summary: Obter detalhes do usuário
- *     tags: [Usuários]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID do usuário
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Detalhes do usuário
- *       404:
- *         description: Usuário não encontrado
- *       500:
- *         description: Erro ao buscar usuário
- */
+// Rota para obter detalhes do usuário
 app.get("/user/:id", checkToken, (req, res) => {
   const id = req.params.id;
 
-  // Consulta SQL para buscar o usuário sem o campo `password`
-  const query = 'SELECT id, name, email FROM users WHERE id = ?';
+  // Consulta SQL para buscar o usuário com o campo `admin_level`
+  const query = 'SELECT id, name, email, admin_level FROM users WHERE id = ?';
   connection.query(query, [id], (err, results) => {
     if (err) {
       return res.status(500).json({ msg: 'Erro ao buscar usuário', error: err.message });
@@ -247,7 +161,155 @@ app.get("/user/:id", checkToken, (req, res) => {
   });
 });
 
+
+// Rota para atualizar nome ou senha do usuário
+app.put('/user/update/:id', checkToken, async (req, res) => {
+  const id = req.params.id;
+  const { name, password, confirmpassword, currentPassword } = req.body;
+
+  // Verificar se a senha atual foi enviada
+  if (!currentPassword) {
+    return res.status(422).json({ msg: "Informe a senha atual para realizar a atualização." });
+  }
+
+  // Verificar se o usuário existe e pegar a senha atual
+  const query = 'SELECT password FROM users WHERE id = ?';
+  connection.query(query, [id], async (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: 'Erro ao buscar usuário', error: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ msg: "Usuário não encontrado!" });
+    }
+
+    const user = results[0];
+
+    // Verificar se a senha atual está correta
+    const checkPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!checkPassword) {
+      return res.status(403).json({ msg: "Senha atual incorreta!" });
+    }
+
+    // Array para armazenar os campos a serem atualizados
+    const fieldsToUpdate = [];
+    const updateValues = [];
+
+    // Verificar se o nome foi enviado e deve ser atualizado
+    if (name) {
+      fieldsToUpdate.push('name = ?');
+      updateValues.push(name);
+    }
+
+    // Verificar se a senha foi enviada e se as senhas coincidem
+    if (password) {
+      if (password !== confirmpassword) {
+        return res.status(422).json({ msg: "As senhas não coincidem." });
+      }
+
+      // Criptografar a nova senha
+      try {
+        const salt = await bcrypt.genSalt(12);
+        const passwordHash = await bcrypt.hash(password, salt);
+        fieldsToUpdate.push('password = ?');
+        updateValues.push(passwordHash);
+      } catch (error) {
+        return res.status(500).json({ msg: 'Erro ao criptografar a nova senha.', error: error.message });
+      }
+    }
+
+    // Se nenhum campo foi enviado para atualização, retornar erro
+    if (fieldsToUpdate.length === 0) {
+      return res.status(422).json({ msg: "Nenhum campo foi enviado para atualização." });
+    }
+
+    // Construir a query de atualização dinamicamente
+    const updateQuery = `UPDATE users SET ${fieldsToUpdate.join(', ')} WHERE id = ?`;
+    updateValues.push(id);
+
+    // Executar a atualização no banco de dados
+    connection.query(updateQuery, updateValues, (err, result) => {
+      if (err) {
+        return res.status(500).json({ msg: 'Erro ao atualizar usuário', error: err.message });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ msg: 'Usuário não encontrado!' });
+      }
+
+      res.status(200).json({ msg: 'Dados atualizados com sucesso!' });
+    });
+  });
+});
+
+
+// Rota para deletar usuário
+app.delete("/user/delete/:id", checkToken, (req, res) => {
+  const id = req.params.id;
+  const { password } = req.body; // Obter a senha do corpo da requisição
+
+  // Consulta SQL para buscar o usuário
+  const query = 'SELECT id, password, admin_level FROM users WHERE id = ?';
+  connection.query(query, [id], async (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: 'Erro ao buscar usuário', error: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ msg: "Usuário não encontrado!" });
+    }
+
+    const userToDelete = results[0];
+    const requestingUserId = req.user.id; // ID do usuário que está tentando excluir
+    const requestingUserAdminLevel = req.user.admin_level; // Nível de admin do usuário que está tentando excluir
+
+    // Verificar se a senha foi fornecida
+    if (!password) {
+      return res.status(400).json({ msg: "Senha é obrigatória." });
+    }
+
+    // Verificar se a senha está correta
+    const isPasswordCorrect = await bcrypt.compare(password, userToDelete.password);
+    if (!isPasswordCorrect) {
+      return res.status(403).json({ msg: "Senha incorreta. Exclusão não permitida." });
+    }
+
+    // Permitir exclusão se o usuário que está tentando excluir é o mesmo
+    if (requestingUserId === userToDelete.id) {
+      // Permitir exclusão se for o mesmo usuário e nível de admin é 0 ou superior
+      return deleteUser(id, res);
+    } else if (requestingUserAdminLevel === 2) {
+      // Permitir exclusão se for admin de nível 2
+      return deleteUser(id, res);
+    } else {
+      // Rejeitar exclusão se não for permitido
+      return res.status(403).json({ msg: "Acesso negado! Você não tem permissão para excluir este usuário." });
+    }
+  });
+});
+
+// Função para excluir o usuário
+function deleteUser(id, res) {
+  const deleteQuery = 'DELETE FROM users WHERE id = ?';
+  connection.query(deleteQuery, [id], (err, result) => {
+    if (err) {
+      return res.status(500).json({ msg: 'Erro ao excluir usuário', error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ msg: 'Usuário não encontrado!' });
+    }
+
+    res.status(200).json({ msg: 'Usuário excluído com sucesso!' });
+  });
+}
+
+
+
+
+
 // Iniciar o servidor
-app.listen(3001, () => {
-  console.log('Servidor rodando na porta 3001');
+
+app.listen(3002, () => {
+  console.log('Servidor rodando na porta 3002');
 });
